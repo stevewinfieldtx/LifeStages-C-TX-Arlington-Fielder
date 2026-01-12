@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       subscription_data: STRIPE_CONFIG.trialDays
         ? { trial_period_days: STRIPE_CONFIG.trialDays }
         : undefined,
-      success_url: `${baseUrl}/subscription?success=true`,
+      success_url: `${baseUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/subscription?canceled=true`,
       allow_promotion_codes: true,
     })
