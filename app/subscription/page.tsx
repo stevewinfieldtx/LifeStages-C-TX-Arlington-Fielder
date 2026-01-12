@@ -18,6 +18,7 @@ function SubscriptionContent() {
     checkout,
     openPortal,
     customerId,
+    refreshSubscription,
   } = useSubscription()
   
   const [isPurchasing, setIsPurchasing] = useState(false)
@@ -27,25 +28,64 @@ function SubscriptionContent() {
   // Check for success or canceled state from URL
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
-      const newSubscription = {
+      const fallbackSubscription = {
         status: 'trialing',
         customerId: 'pending',
         currentPeriodEnd: Date.now() + (7 * 24 * 60 * 60 * 1000),
         trialEnd: Date.now() + (7 * 24 * 60 * 60 * 1000),
         updatedAt: Date.now(),
       }
-      localStorage.setItem('bible_subscription', JSON.stringify(newSubscription))
-      setShowSuccess(true)
-      window.history.replaceState({}, '', '/subscription')
-      setTimeout(() => {
-        router.push('/')
-      }, 2000)
+      const sessionId = searchParams.get('session_id')
+
+      const finalizeSuccess = (subscriptionData: typeof fallbackSubscription) => {
+        localStorage.setItem('bible_subscription', JSON.stringify(subscriptionData))
+        refreshSubscription()
+        setShowSuccess(true)
+        window.history.replaceState({}, '', '/subscription')
+        setTimeout(() => {
+          router.push('/')
+        }, 2000)
+      }
+
+      if (!sessionId) {
+        finalizeSuccess(fallbackSubscription)
+        return
+      }
+
+      const fetchSession = async () => {
+        try {
+          const response = await fetch('/api/stripe/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+          })
+
+          if (!response.ok) {
+            throw new Error('Unable to verify subscription session.')
+          }
+
+          const data = await response.json()
+
+          finalizeSuccess({
+            status: data.status ?? fallbackSubscription.status,
+            customerId: data.customerId ?? fallbackSubscription.customerId,
+            currentPeriodEnd: data.currentPeriodEnd ?? fallbackSubscription.currentPeriodEnd,
+            trialEnd: data.trialEnd ?? fallbackSubscription.trialEnd,
+            updatedAt: Date.now(),
+          })
+        } catch (err) {
+          console.error('Failed to verify Stripe session:', err)
+          finalizeSuccess(fallbackSubscription)
+        }
+      }
+
+      void fetchSession()
     }
     
     if (searchParams.get('canceled') === 'true') {
       setError('Purchase was canceled. Feel free to try again when ready.')
     }
-  }, [searchParams, router])
+  }, [searchParams, router, refreshSubscription])
 
   const freeFeatures = [
     "Daily verse with friendly description",

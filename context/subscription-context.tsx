@@ -127,7 +127,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, [trialEndsAt])
 
   // Load subscription from localStorage on mount
-  useEffect(() => {
+  const loadStoredSubscription = useCallback(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION)
       if (stored) {
@@ -135,16 +135,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         // Check if subscription is still valid (not expired)
         if (parsed.currentPeriodEnd > Date.now()) {
           setSubscription(parsed)
-        } else {
-          // Subscription expired, clear it
-          localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION)
+          return
         }
+        // Subscription expired, clear it
+        localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION)
       }
     } catch {
       // Invalid data, ignore
     }
-    setIsLoading(false)
+    setSubscription(null)
   }, [])
+
+  useEffect(() => {
+    loadStoredSubscription()
+    setIsLoading(false)
+  }, [loadStoredSubscription])
 
   // Check for subscription success from URL params
   useEffect(() => {
@@ -273,10 +278,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   // Refresh subscription (would typically call your backend)
   const refreshSubscription = useCallback(() => {
-    // In a full implementation, this would call your backend
-    // to get the latest subscription status from Stripe
-    console.log('Refresh subscription - implement backend verification')
-  }, [])
+    loadStoredSubscription()
+  }, [loadStoredSubscription])
 
   // Legacy functions for backwards compatibility
   const startTrial = useCallback(() => {
